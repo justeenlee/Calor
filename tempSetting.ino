@@ -8,37 +8,50 @@ int DS18S20_Pin = 2; //DS18S20 Signal pin on digital 2
 OneWire ds(DS18S20_Pin);  // on digital pin 2
 Servo myservo;  // create servo object to control a servo 
 
-
 int potIn = A0;
 int potRead;
-int targetTemp=100;
+int targetTemp=50;
 int motorPos = 0;
+int encoderPin1 = 21;
+int encoderPin2 = 20;
+volatile int lastEncoded = 0;
+volatile long encoderValue = 0;
+volatile long lastEncoderValue = -1;
  
 void setup() {
   lcd.clear();                    //clear the LCD during setup
   lcd.begin(16,2);                //define the columns (16) and rows (2)
   myservo.attach(6);  // attaches the servo on pin 9 to the servo object 
+  pinMode(encoderPin1, INPUT);
+  pinMode(encoderPin2, INPUT);
+  digitalWrite(encoderPin1, HIGH);
+  digitalWrite(encoderPin2, HIGH);
+  attachInterrupt(2, updateEncoder, CHANGE);
+  attachInterrupt(3, updateEncoder, CHANGE);
+  
   Serial.begin(9600);
 
 }
  
 void loop() {
-  displayTemp();
-  adjustTemp();
+ //Serial.println(encoderValue);
+
+ displayTemp();
+  //adjustTemp();
 }
 
 
-
-
 void setTemp(){
-  potRead = analogRead(potIn);
-  targetTemp = map(potRead, 3, 1020, 50, 130);
+  //potRead = analogRead(potIn);
+  //temperature range: 50F - 130F
+  //targetTemp = map(potRead, 3, 1020, 50, 130);
+  targetTemp += encoderValue;
 }
 
 
 void displayTemp(){
   lcd.print("SetTempTo: ");
-  setTemp();
+  //setTemp();
   lcd.print(targetTemp);
   if (targetTemp>=100) {
     lcd.setCursor(14,0);
@@ -56,8 +69,46 @@ void displayTemp(){
   lcd.print("F ");
   delay(250);
   lcd.home();
-
 }
+
+
+void updateEncoder(){
+  int MSB = digitalRead(encoderPin1); //MSB = most significant bit
+  int LSB = digitalRead(encoderPin2); //LSB = least significant bit
+  int encoded = (MSB << 1) |LSB; //converting the 2 pin value to single number
+  int sum  = (lastEncoded << 2) | encoded; //adding it to the previous encoded value
+  
+  //1. initial state: no response left turn
+  //2. downstream state: no response to left turn after from 1 to 0
+  if (((lastEncoderValue == -1) && (encoderValue == 0)) ||
+    ((lastEncoderValue == 1) && (encoderValue == 0)))
+  {
+    if(sum == 0b1110) {
+      lastEncoderValue = encoderValue;
+      encoderValue ++;
+    }
+  }
+  //3. upstream state: no response to right turn after from 9 to 10
+  else if ((lastEncoderValue == 79) && (encoderValue == 80)){
+    if(sum == 0b1101){
+      lastEncoderValue = encoderValue;
+      encoderValue --;
+    }
+  }
+  else {
+    if(sum == 0b1101) {
+      lastEncoderValue = encoderValue;
+      encoderValue --;
+    }
+    else if(sum == 0b1110) {
+      lastEncoderValue = encoderValue;
+      encoderValue ++;
+    }
+  }
+  targetTemp = encoderValue + 50;
+  lastEncoded = encoded; //store this value for next time
+}
+
 
 int getFloorInt(float number){
   return int(floor(number));
@@ -72,16 +123,13 @@ void adjustTemp() {
 
 float getTemp(){
   //returns the temperature from one DS18S20 in DEG Celsius
-
   byte data[12];
   byte addr[8];
-
   if ( !ds.search(addr)) {
       //no more sensors on chain, reset search
       ds.reset_search();
       return -1000;
   }
-
   if ( OneWire::crc8( addr, 7) != addr[7]) {
       Serial.println("CRC is not valid!");
       return -1000;

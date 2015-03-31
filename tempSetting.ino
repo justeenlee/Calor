@@ -10,7 +10,7 @@ Servo myservo;  // create servo object to control a servo
 
 int potIn = A0;
 int potRead;
-int targetTemp=50;
+int targetTemp=90;
 int motorPos = 0;
 int encoderPin1 = 21;
 int encoderPin2 = 20;
@@ -37,14 +37,14 @@ void loop() {
  //Serial.println(encoderValue);
 
  displayTemp();
-  //adjustTemp();
+ adjustTemp();
 }
 
 
 void setTemp(){
   //potRead = analogRead(potIn);
-  //temperature range: 50F - 130F
-  //targetTemp = map(potRead, 3, 1020, 50, 130);
+  //temperature range: 50F - 110F
+  //targetTemp = map(potRead, 3, 1020, 50, 110);
   targetTemp += encoderValue;
 }
 
@@ -89,7 +89,7 @@ void updateEncoder(){
     }
   }
   //3. upstream state: no response to right turn after from 9 to 10
-  else if ((lastEncoderValue == 79) && (encoderValue == 80)){
+  else if ((lastEncoderValue == 39) && (encoderValue == 40)){
     if(sum == 0b1101){
       lastEncoderValue = encoderValue;
       encoderValue --;
@@ -105,7 +105,7 @@ void updateEncoder(){
       encoderValue ++;
     }
   }
-  targetTemp = encoderValue + 50;
+  targetTemp = encoderValue + 90;
   lastEncoded = encoded; //store this value for next time
 }
 
@@ -115,7 +115,7 @@ int getFloorInt(float number){
 }
 
 void adjustTemp() {
-  motorPos = map(targetTemp, 50, 130, 179, 0);
+  motorPos = map(targetTemp, 50, 110, 179, 0);
   //delay(1000);
   myservo.write(motorPos);
   delay(100);
